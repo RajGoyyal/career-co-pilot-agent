@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { ChangeEvent, useMemo, useRef, useState } from "react";
 import { useCareer } from "@/lib/career-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ import {
   Radar,
   Sparkles,
   Target,
+  Upload,
   UsersRound,
   Zap,
   type LucideIcon,
@@ -33,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { analyzeResumeFile } from "@/lib/resume-parser";
 
 type FeatureCard = {
   icon: LucideIcon;
@@ -146,9 +148,13 @@ const steps = [
 ];
 
 export default function LandingPage() {
-  const { setCurrentStep } = useCareer();
+  const { setCurrentStep, setProfile } = useCareer();
   const [selectedFeature, setSelectedFeature] = useState<FeatureCard | null>(null);
   const [featureDialogOpen, setFeatureDialogOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [lastUploadedFile, setLastUploadedFile] = useState<string | null>(null);
   const marketPulseFeature = useMemo(() => features.find((f) => f.title === "Market Pulse") ?? null, []);
   const roleTemplatesFeature = useMemo(() => features.find((f) => f.title === "Role-Based Templates") ?? null, []);
 
@@ -156,6 +162,45 @@ export default function LandingPage() {
     if (!feature.priority) return;
     setSelectedFeature(feature);
     setFeatureDialogOpen(true);
+  };
+
+  const handleResumeUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleResumeFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setResumeError(null);
+    setLastUploadedFile(file.name);
+    setIsAnalyzingResume(true);
+
+    try {
+      const { derived, text, skills } = await analyzeResumeFile(file);
+
+      setProfile({
+        name: derived.name ?? "Student",
+        email: derived.email ?? "",
+        resumeText: text,
+        githubUrl: derived.github ?? "",
+        linkedinUrl: derived.linkedin ?? "",
+        extractedSkills: skills,
+        experience: derived.experienceSummary ?? "",
+        education: derived.educationSummary ?? "",
+      });
+
+      setCurrentStep("dream-role");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "We couldn't analyze that file. Please try another format.";
+      setResumeError(message);
+      setLastUploadedFile(null);
+    } finally {
+      setIsAnalyzingResume(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   return (
@@ -216,6 +261,64 @@ export default function LandingPage() {
             >
               Learn More
             </Button>
+          </div>
+
+          <div className="mx-auto mt-12 w-full max-w-3xl">
+            <div className="rounded-2xl border border-dashed border-primary/30 bg-background/80 p-6 shadow-sm backdrop-blur">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="text-left">
+                  <h2 className="text-xl font-semibold">Upload your resume to auto-analyze</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Drop a PDF, Word, or JSON resume and we will instantly extract your skills and jump to the dream role planner.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    <Badge variant="outline">PDF</Badge>
+                    <Badge variant="outline">DOCX</Badge>
+                    <Badge variant="outline">JSON</Badge>
+                  </div>
+                </div>
+                <div className="flex w-full flex-col items-stretch gap-2 lg:w-56">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.json,application/pdf,application/json,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={handleResumeFileChange}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={handleResumeUploadClick}
+                    disabled={isAnalyzingResume}
+                    className="border-primary/50"
+                  >
+                    {isAnalyzingResume ? (
+                      <>
+                        <span className="mr-2 inline-flex h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload Resume
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-center text-xs text-muted-foreground">
+                    Redirects automatically after analysis
+                  </p>
+                </div>
+              </div>
+              {lastUploadedFile && !resumeError && (
+                <div className="mt-3 text-xs text-muted-foreground">
+                  Processing {lastUploadedFile}...
+                </div>
+              )}
+              {resumeError && (
+                <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+                  {resumeError}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Stats */}
