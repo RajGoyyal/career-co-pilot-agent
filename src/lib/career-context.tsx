@@ -31,6 +31,14 @@ export interface ProfileData {
   extractedSkills: Skill[];
   experience: string;
   education: string;
+  insights: ProfileInsights;
+}
+
+export interface ProfileInsights {
+  topSkills: string[];
+  missingFields: string[];
+  experienceYears: number | null;
+  summary: string[];
 }
 
 export interface DreamRole {

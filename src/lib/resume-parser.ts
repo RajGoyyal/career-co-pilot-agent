@@ -1,4 +1,4 @@
-import type { Skill } from "./career-context";
+import type { ProfileInsights, Skill } from "./career-context";
 import { extractSkillsFromText } from "./career-engine";
 
 interface SectionConfig {
@@ -32,6 +32,7 @@ export interface ResumeAnalysisResult {
   derived: DerivedProfileFields;
   skills: Skill[];
   format: SupportedFormat;
+  insights: ProfileInsights;
 }
 
 function cleanResumeText(input: string): string {
@@ -194,6 +195,70 @@ function pushCurrentLine(lines: string[], currentLine: string[]) {
   }
 }
 
+function estimateExperienceYears(text: string): number | null {
+  const matches = Array.from(text.matchAll(/(\d+)\s*(?:\+)?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:experience|exp)/gi));
+  if (matches.length === 0) return null;
+  const values = matches
+    .map((match) => parseInt(match[1], 10))
+    .filter((val) => Number.isFinite(val) && val <= 80);
+  if (values.length === 0) return null;
+  return Math.max(...values);
+}
+
+export function buildResumeInsights(params: {
+  text: string;
+  skills: Skill[];
+  derived: DerivedProfileFields;
+  overrides?: Partial<DerivedProfileFields>;
+}): ProfileInsights {
+  const { text, skills, derived, overrides } = params;
+  const available = { ...derived, ...(overrides ?? {}) };
+
+  const uniqueSkills: string[] = [];
+  for (const skill of skills) {
+    if (!uniqueSkills.includes(skill.name)) {
+      uniqueSkills.push(skill.name);
+    }
+  }
+  const topSkills = uniqueSkills.slice(0, 8);
+
+  const missingFields: string[] = [];
+  if (!available.email) missingFields.push("Add an email so hiring partners can reach you.");
+  if (!available.linkedin) missingFields.push("Link your LinkedIn profile for richer networking insights.");
+  if (!available.github) missingFields.push("Share your GitHub or portfolio to surface project signals.");
+
+  const experienceYears = estimateExperienceYears(text);
+
+  const summary: string[] = [];
+  if (topSkills.length >= 3) {
+    summary.push(`Strong signals across ${topSkills.slice(0, 3).join(", ")}.`);
+  } else if (topSkills.length > 0) {
+    summary.push(`Detected skills: ${topSkills.join(", ")}.`);
+  }
+
+  if (experienceYears) {
+    summary.push(`Resume mentions roughly ${experienceYears}+ years of experience.`);
+  }
+
+  if (available.experienceSummary) {
+    summary.push("Experience section captured for roadmap context.");
+  }
+  if (available.educationSummary) {
+    summary.push("Education highlights ready for market alignment.");
+  }
+
+  if (summary.length === 0) {
+    summary.push("We captured your resume details and can refine them on the next step.");
+  }
+
+  return {
+    topSkills,
+    missingFields,
+    experienceYears,
+    summary,
+  };
+}
+
 async function extractDocxText(file: File): Promise<string> {
   const { extractRawText } = await import("mammoth");
   const arrayBuffer = await file.arrayBuffer();
@@ -289,11 +354,13 @@ export async function analyzeResumeFile(file: File): Promise<ResumeAnalysisResul
 
   const derived = deriveProfileDetails(text);
   const skills = extractSkillsFromText(text);
+  const insights = buildResumeInsights({ text, skills, derived });
 
   return {
     text,
     derived,
     skills,
     format,
+    insights,
   };
 }

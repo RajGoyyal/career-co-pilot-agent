@@ -14,6 +14,8 @@ import {
   Briefcase,
   Star,
   CheckCircle2,
+  Sparkles,
+  AlertCircle,
 } from "lucide-react";
 import { useState } from "react";
 import type { DreamRole } from "@/lib/career-context";
@@ -27,6 +29,7 @@ const demandColors = {
 export default function DreamRoleStep() {
   const { setCurrentStep, setDreamRole, state } = useCareer();
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const insights = state.profile?.insights;
 
   const handleContinue = () => {
     if (!selectedRole) return;
@@ -86,6 +89,64 @@ export default function DreamRoleStep() {
             {state.profile?.name ? `${state.profile.name}, select` : "Select"} the role you want to grow into. The agent will map your current skills against its requirements.
           </p>
         </div>
+
+        {insights && (
+          <Card className="mb-10 border-primary/30 bg-primary/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                Resume Highlights
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                We analyzed your upload to spotlight strengths and prep you for the next step.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2 text-sm">
+                {insights.summary.map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
+                    <span className="text-muted-foreground">{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              {insights.topSkills.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">Detected Strengths</h3>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {insights.topSkills.map((skill) => (
+                      <Badge key={skill} variant="secondary" className="text-xs">
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {typeof insights.experienceYears === "number" && insights.experienceYears > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  Approximate experience detected: <span className="font-medium text-foreground">{insights.experienceYears}+ years</span>
+                </div>
+              )}
+
+              {insights.missingFields.length > 0 && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                  <div className="flex items-start gap-2 text-xs text-amber-700">
+                    <AlertCircle className="mt-0.5 h-4 w-4" />
+                    <ul className="space-y-1">
+                      {insights.missingFields.map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-4 md:grid-cols-2">
           {Object.entries(ROLE_TEMPLATES).map(([roleName, template]) => {

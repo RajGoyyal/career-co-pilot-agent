@@ -177,7 +177,7 @@ export default function LandingPage() {
     setIsAnalyzingResume(true);
 
     try {
-      const { derived, text, skills } = await analyzeResumeFile(file);
+      const { derived, text, skills, insights } = await analyzeResumeFile(file);
 
       setProfile({
         name: derived.name ?? "Student",
@@ -188,6 +188,7 @@ export default function LandingPage() {
         extractedSkills: skills,
         experience: derived.experienceSummary ?? "",
         education: derived.educationSummary ?? "",
+        insights,
       });
 
       setCurrentStep("dream-role");

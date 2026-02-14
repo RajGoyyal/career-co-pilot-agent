@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { getSkillColor } from "@/lib/career-engine";
 import type { Skill } from "@/lib/career-context";
+import { buildResumeInsights, deriveProfileDetails } from "@/lib/resume-parser";
 
 export default function ProfileStep() {
   const { setCurrentStep, setProfile } = useCareer();
@@ -50,6 +51,22 @@ export default function ProfileStep() {
     const allText = [resumeText, experience, education].join(" ");
     const skills = extractedSkills.length > 0 ? extractedSkills : extractSkillsFromText(allText);
 
+    const combinedText = [resumeText, experience, education].filter(Boolean).join("\n\n");
+    const derived = deriveProfileDetails(combinedText || allText);
+    const insights = buildResumeInsights({
+      text: combinedText || allText,
+      skills,
+      derived,
+      overrides: {
+        name: name || undefined,
+        email: email || undefined,
+        linkedin: linkedinUrl || undefined,
+        github: githubUrl || undefined,
+        experienceSummary: experience || undefined,
+        educationSummary: education || undefined,
+      },
+    });
+
     setProfile({
       name: name || "Student",
       email,
@@ -59,6 +76,7 @@ export default function ProfileStep() {
       extractedSkills: skills,
       experience,
       education,
+      insights,
     });
     setCurrentStep("dream-role");
   };
