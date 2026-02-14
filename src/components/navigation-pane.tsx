@@ -17,11 +17,20 @@ import {
   Minimize2,
   Map,
   Target,
+  Sparkles,
 } from "lucide-react";
 import { CareerStep, useCareer } from "@/lib/career-context";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const stepMetadata: Record<CareerStep, { label: string; description: string; icon: LucideIcon }> = {
   landing: {
@@ -72,9 +81,10 @@ const keyboardShortcuts = [
 ];
 
 export function NavigationPane() {
-  const { state, goBack, goForward, jumpToHistory } = useCareer();
+  const { state, goBack, goForward, jumpToHistory, setCurrentStep } = useCareer();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [featureDialogOpen, setFeatureDialogOpen] = useState(false);
   const timeFormatter = useMemo(
     () =>
       new Intl.DateTimeFormat(undefined, {
@@ -215,6 +225,15 @@ export function NavigationPane() {
               <Button
                 size="icon-sm"
                 variant="ghost"
+                onClick={() => setFeatureDialogOpen(true)}
+                aria-label="Open feature spotlight"
+                className="rounded-full"
+              >
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
                 onClick={() => setIsCollapsed(true)}
                 aria-label="Collapse navigation pane"
                 className="rounded-full"
@@ -313,6 +332,32 @@ export function NavigationPane() {
           </div>
         </>
       )}
+      <Dialog open={featureDialogOpen} onOpenChange={setFeatureDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Feature Spotlight</DialogTitle>
+            <DialogDescription>
+              Preview upcoming capabilities like the Adaptive Interview Simulator, Role-Based Templates, Market Pulse Radar, Referral Marketplace, and Wellbeing Lens.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              Visit the landing experience to see priorities, benefits, and stakeholders for each spotlight feature.
+            </p>
+          </div>
+          <DialogFooter className="justify-between">
+            <Button variant="outline" onClick={() => setFeatureDialogOpen(false)}>Close</Button>
+            <Button
+              onClick={() => {
+                setFeatureDialogOpen(false);
+                setCurrentStep("landing");
+              }}
+            >
+              Launch Feature Deck
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }

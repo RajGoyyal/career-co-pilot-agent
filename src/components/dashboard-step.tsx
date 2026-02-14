@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useCareer } from "@/lib/career-context";
 import { getLevelLabel, getPriorityColor } from "@/lib/career-engine";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Calendar,
   Clock,
@@ -26,6 +34,7 @@ import {
 
 export default function DashboardStep() {
   const { state, setCurrentStep, toggleDayComplete, resetState } = useCareer();
+  const [featureDialogOpen, setFeatureDialogOpen] = useState(false);
 
   const completedCount = state.completedDays.length;
   const totalDays = state.roadmap?.days.length || 30;
@@ -74,8 +83,30 @@ export default function DashboardStep() {
   if (!state.roadmap) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p>No data yet.</p>
-        <Button onClick={() => setCurrentStep("landing")} className="ml-4">Start Over</Button>
+        <div className="space-y-4 text-center">
+          <p className="text-muted-foreground">No data yet. Set up your profile to unlock the dashboard.</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Button onClick={() => setCurrentStep("landing")}>
+              <Compass className="mr-2 h-4 w-4" /> Launch Career Navigator
+            </Button>
+            <Button variant="outline" onClick={() => setFeatureDialogOpen(true)}>
+              Feature Spotlight
+            </Button>
+          </div>
+        </div>
+        <Dialog open={featureDialogOpen} onOpenChange={setFeatureDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Feature Spotlight</DialogTitle>
+              <DialogDescription>
+                Explore planned enhancements such as Adaptive Interview Simulator, Market Pulse Radar, Referral Marketplace, and Wellbeing Lens.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setFeatureDialogOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -392,6 +423,17 @@ export default function DashboardStep() {
                 <CardTitle className="text-lg">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                <Button className="w-full justify-start" size="sm" onClick={() => setCurrentStep("landing")}>
+                  <Compass className="mr-2 h-4 w-4" /> Launch Career Navigator
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  size="sm"
+                  onClick={() => setFeatureDialogOpen(true)}
+                >
+                  <Compass className="mr-2 h-4 w-4" /> Feature Spotlight
+                </Button>
                 <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => setCurrentStep("roadmap")}>
                   <Map className="mr-2 h-4 w-4" /> View Full Roadmap
                 </Button>
@@ -409,6 +451,28 @@ export default function DashboardStep() {
           </div>
         </div>
       </div>
+
+      <Dialog open={featureDialogOpen} onOpenChange={setFeatureDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Feature Spotlight</DialogTitle>
+            <DialogDescription>
+              Explore upcoming capabilities like the Adaptive Interview Simulator, Market Pulse Radar, Referral Marketplace, and Wellbeing Lens.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              Visit the landing experience to deep dive into each feature card and see priority, benefits, and stakeholder insights.
+            </p>
+            <Button size="sm" onClick={() => { setFeatureDialogOpen(false); setCurrentStep("landing"); }}>
+              Launch Feature Deck
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFeatureDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

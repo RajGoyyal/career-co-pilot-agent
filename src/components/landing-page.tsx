@@ -1,21 +1,48 @@
 "use client";
 
+import { useState } from "react";
 import { useCareer } from "@/lib/career-context";
 import { Button } from "@/components/ui/button";
 import {
-  Brain,
-  Target,
-  Map,
-  Sparkles,
   ArrowRight,
   BarChart3,
-  GitBranch,
-  Compass,
+  Bot,
+  Brain,
   CheckCircle2,
+  Compass,
+  FilePenLine,
+  GitBranch,
+  Handshake,
+  HeartPulse,
+  Map,
+  Radar,
+  Sparkles,
+  Target,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
-const features = [
+type FeatureCard = {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  priority?: "Low" | "Medium" | "High";
+  benefit?: string;
+  effort?: "Low" | "Medium" | "High";
+  featureType?: "User-facing" | "Infrastructure";
+  stakeholders?: string;
+};
+
+const features: FeatureCard[] = [
   {
     icon: Brain,
     title: "Skill Extraction",
@@ -46,6 +73,36 @@ const features = [
     title: "Progress Tracking",
     description: "Track your journey with interactive dashboards, milestones, and weekly goal reviews.",
   },
+  {
+    icon: Bot,
+    title: "Adaptive Interview Simulator",
+    description: "Run AI-driven mock interviews tuned to your roadmap progress and receive actionable feedback loops.",
+  },
+  {
+    icon: FilePenLine,
+    title: "Role-Based Templates",
+    description: "Generate resumes, cover letters, and outreach emails auto-filled from your evolving skill graph.",
+  },
+  {
+    icon: Radar,
+    title: "Market Pulse",
+    description: "Monitor live labour market signals with demand indicators and salary bands for your target roles.",
+  },
+  {
+    icon: Handshake,
+    title: "Referral Marketplace",
+    description: "Connect with hiring partners via curated referrals once you complete key roadmap milestones.",
+  },
+  {
+    icon: HeartPulse,
+    title: "Wellbeing Lens",
+    description: "Balance workload with wellbeing insights that recommend breaks, pacing, and recovery nudges.",
+    priority: "Low",
+    benefit: "Improves satisfaction and reduces burnout risk for sustained engagement.",
+    effort: "Low",
+    featureType: "User-facing",
+    stakeholders: "UX Research, Wellbeing Advisor, Frontend Engineer",
+  },
 ];
 
 const steps = [
@@ -57,6 +114,14 @@ const steps = [
 
 export default function LandingPage() {
   const { setCurrentStep } = useCareer();
+  const [selectedFeature, setSelectedFeature] = useState<FeatureCard | null>(null);
+  const [featureDialogOpen, setFeatureDialogOpen] = useState(false);
+
+  const handleFeatureOpen = (feature: FeatureCard) => {
+    if (!feature.priority) return;
+    setSelectedFeature(feature);
+    setFeatureDialogOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -170,18 +235,46 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="group rounded-xl border border-border/50 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg"
-              >
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
-                  <feature.icon className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold">{feature.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{feature.description}</p>
-              </div>
-            ))}
+            {features.map((feature) => {
+              const isInteractive = Boolean(feature.priority);
+
+              if (!isInteractive) {
+                return (
+                  <div
+                    key={feature.title}
+                    className="group rounded-xl border border-border/50 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg"
+                  >
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+                      <feature.icon className="h-6 w-6 text-primary" aria-hidden="true" />
+                    </div>
+                    <h3 className="text-lg font-semibold">{feature.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{feature.description}</p>
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  key={feature.title}
+                  type="button"
+                  onClick={() => handleFeatureOpen(feature)}
+                  className="group rounded-xl border border-border/50 bg-card p-6 text-left transition-all hover:border-primary/30 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  aria-haspopup="dialog"
+                >
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+                    <feature.icon className="h-6 w-6 text-primary" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-lg font-semibold">{feature.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{feature.description}</p>
+                  <div className="mt-4 flex items-center justify-between text-xs">
+                    <Badge variant="outline" className="uppercase">
+                      {feature.featureType}
+                    </Badge>
+                    <span className="text-muted-foreground">Tap to explore</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -261,6 +354,47 @@ export default function LandingPage() {
           Career Navigator -- AI-Powered Career Co-Pilot
         </div>
       </footer>
+
+      <Dialog
+        open={featureDialogOpen}
+        onOpenChange={(open) => {
+          setFeatureDialogOpen(open);
+          if (!open) setSelectedFeature(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedFeature?.title ?? "Feature"}</DialogTitle>
+            <DialogDescription>
+              {selectedFeature?.description ?? "Upcoming capability to level-up your career experience."}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedFeature && (
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="uppercase">
+                  {selectedFeature.featureType}
+                </Badge>
+                <Badge variant="outline">Priority: {selectedFeature.priority}</Badge>
+                <Badge variant="outline">Effort: {selectedFeature.effort}</Badge>
+              </div>
+              <div>
+                <span className="font-semibold">Benefit:</span> {selectedFeature.benefit}
+              </div>
+              {selectedFeature.stakeholders && (
+                <div>
+                  <span className="font-semibold">Stakeholders:</span> {selectedFeature.stakeholders}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFeatureDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
