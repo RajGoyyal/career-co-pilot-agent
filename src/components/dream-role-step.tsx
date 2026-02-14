@@ -17,7 +17,7 @@ import {
   Sparkles,
   AlertCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { DreamRole } from "@/lib/career-context";
 
 const demandColors = {
@@ -30,6 +30,41 @@ export default function DreamRoleStep() {
   const { setCurrentStep, setDreamRole, state } = useCareer();
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const insights = state.profile?.insights;
+
+  const roleSuggestions = useMemo(() => {
+    const skills = state.profile?.extractedSkills ?? [];
+    if (skills.length === 0) return [] as Array<{
+      roleName: string;
+      score: number;
+      matchedSkills: string[];
+      missingSkills: string[];
+    }>;
+
+    const normalizedSkills = new Set(skills.map((skill) => skill.name.toLowerCase()));
+
+    return Object.entries(ROLE_TEMPLATES)
+      .map(([roleName, template]) => {
+        const matchedSkills = template.requiredSkills
+          .filter((req) => normalizedSkills.has(req.name.toLowerCase()))
+          .map((req) => req.name);
+
+        const missingSkills = template.requiredSkills
+          .filter((req) => !normalizedSkills.has(req.name.toLowerCase()))
+          .map((req) => req.name);
+
+        const score = matchedSkills.length / template.requiredSkills.length;
+
+        return {
+          roleName,
+          score,
+          matchedSkills,
+          missingSkills,
+        };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  }, [state.profile?.extractedSkills]);
 
   const handleContinue = () => {
     if (!selectedRole) return;
@@ -144,6 +179,59 @@ export default function DreamRoleStep() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {roleSuggestions.length > 0 && (
+          <Card className="mb-10 border-border/60">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-primary">
+                  <Compass className="h-4 w-4" />
+                </span>
+                Suggested Roles For You
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Based on the skills in your resume, these paths look most aligned. Pick one to dive deeper.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {roleSuggestions.map((suggestion) => {
+                const pct = Math.round(suggestion.score * 100);
+                const isSelected = selectedRole === suggestion.roleName;
+                const highlightSkills = suggestion.matchedSkills.slice(0, 3).join(", ");
+                const nextSkills = suggestion.missingSkills.slice(0, 2).join(", ");
+
+                return (
+                  <button
+                    key={suggestion.roleName}
+                    type="button"
+                    onClick={() => setSelectedRole(suggestion.roleName)}
+                    className={`w-full rounded-lg border px-4 py-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                      isSelected ? "border-primary bg-primary/10 shadow" : "border-border/60 hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">{suggestion.roleName}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Match score: <span className="font-medium text-foreground">{pct}%</span>
+                          {highlightSkills && ` • Strengths: ${highlightSkills}`}
+                        </div>
+                        {nextSkills && (
+                          <div className="mt-1 text-xs text-muted-foreground/80">
+                            Next skills to grow: {nextSkills}
+                          </div>
+                        )}
+                      </div>
+                      <Badge variant={isSelected ? "default" : "outline"} className="text-xs">
+                        Tap to explore
+                      </Badge>
+                    </div>
+                  </button>
+                );
+              })}
             </CardContent>
           </Card>
         )}

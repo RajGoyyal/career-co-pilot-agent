@@ -5,7 +5,6 @@ import { VisualEditsMessenger } from "orchids-visual-edits";
 import { Toaster } from "@/components/ui/sonner";
 import { CareerProvider } from "@/lib/career-context";
 import NavigationPane from "@/components/navigation-pane";
-import AIChatPanel from "@/components/ai-chat-panel";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -27,7 +26,6 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <CareerProvider>
           <NavigationPane />
-          <AIChatPanel />
           {children}
         </CareerProvider>
         <Toaster />
