@@ -101,7 +101,93 @@ export default function DashboardStep() {
   const summaryData = useMemo(() => {
     if (!state.profile || !state.dreamRole) return null;
 
-    const topGaps = state.skillGaps.filter((gap) => gap.gap > 0).slice(0, 5);
+    const gapsNeedingWork = state.skillGaps.filter((gap) => gap.gap > 0);
+    const topGaps = gapsNeedingWork.slice(0, 5);
+    const criticalGaps = gapsNeedingWork.filter((gap) => gap.priority === "critical");
+    const importantGaps = gapsNeedingWork.filter((gap) => gap.priority === "important");
+    const niceToHaveGaps = gapsNeedingWork.filter((gap) => gap.priority === "nice-to-have");
+    const metSkills = state.skillGaps.filter((gap) => gap.gap === 0);
+
+    const readinessStage = progressPercent >= 75
+      ? "Launch Ready"
+      : progressPercent >= 50
+      ? "Momentum Building"
+      : progressPercent > 0
+      ? "Foundations Underway"
+      : "Kickoff";
+
+    const readinessNarrative = (() => {
+      if (progressPercent >= 75) {
+        return "Portfolio is nearly complete. Shift emphasis to interview reps and outreach sequencing.";
+      }
+      if (progressPercent >= 50) {
+        return "Translate new skills into end-to-end projects and storytelling artifacts.";
+      }
+      if (progressPercent > 0) {
+        return "Keep momentum by pairing daily lessons with quick retros to lock in learning.";
+      }
+      return "Run the agent workflow to generate your personalized roadmap and unlock guided tasks.";
+    })();
+
+    const focusAreaCounts: Record<string, number> = {};
+    state.roadmap?.days.forEach((day) => {
+      focusAreaCounts[day.skillFocus] = (focusAreaCounts[day.skillFocus] || 0) + 1;
+    });
+    const focusAreas = Object.entries(focusAreaCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([skill, emphasisDays]) => ({
+        skill,
+        emphasisDays,
+        priority: state.skillGaps.find((gap) => gap.skill === skill)?.priority ?? "support",
+      }));
+
+    const upcomingTasks = state.roadmap
+      ? state.roadmap.days
+          .filter((day) => !state.completedDays.includes(day.day))
+          .slice(0, 5)
+          .map((day) => ({
+            day: day.day,
+            title: day.title,
+            skill: day.skillFocus,
+            hours: day.estimatedHours,
+            checkpoint: day.checkpoint,
+          }))
+      : [];
+
+    const recommendedActions: string[] = [];
+    if (!state.completedDays.length) {
+      recommendedActions.push("Toggle into the roadmap module and mark a single day complete to activate progress analytics.");
+    }
+    if (criticalGaps.length) {
+      recommendedActions.push(
+        `Schedule focused sessions on ${criticalGaps.slice(0, 2).map((gap) => gap.skill).join(", ")}${
+          criticalGaps.length > 2 ? ` (+${criticalGaps.length - 2} more)` : ""
+        } to neutralize critical blockers.`
+      );
+    }
+    if (progressPercent < 50 && state.roadmap) {
+      recommendedActions.push("Spin up a portfolio artifact from this week's tasks to document tangible momentum.");
+    }
+    if (progressPercent >= 50 && progressPercent < 75) {
+      recommendedActions.push("Begin mock interviews targeting behavioral and role-specific narratives.");
+    }
+    if (progressPercent >= 75) {
+      recommendedActions.push("Launch an application sprint with 5-7 high-fit opportunities this week.");
+    }
+
+    const growthOpportunities = gapsNeedingWork
+      .slice(0, 3)
+      .map((gap) => ({
+        skill: gap.skill,
+        priority: gap.priority,
+        targetLevel: getLevelLabel(gap.requiredLevel),
+        supportHours: state.roadmap
+          ? state.roadmap.days
+              .filter((day) => day.skillFocus === gap.skill)
+              .reduce((sum, day) => sum + day.estimatedHours, 0)
+          : 0,
+      }));
 
     return {
       generatedAt: new Date().toISOString(),
@@ -132,6 +218,12 @@ export default function DashboardStep() {
         totalHours: variant.totalHours,
         milestoneCount: variant.milestones.length,
       })),
+      metrics: {
+        criticalGapCount: criticalGaps.length,
+        importantGapCount: importantGaps.length,
+        niceToHaveGapCount: niceToHaveGaps.length,
+        skillsMet: metSkills.length,
+      },
       progress: {
         completedDays: completedCount,
         totalDays,
@@ -148,6 +240,14 @@ export default function DashboardStep() {
         currentLevel: getLevelLabel(gap.currentLevel),
         targetLevel: getLevelLabel(gap.requiredLevel),
       })),
+      readiness: {
+        stage: readinessStage,
+        narrative: readinessNarrative,
+      },
+      recommendedActions,
+      upcomingTasks,
+      focusAreas,
+      growthOpportunities,
     };
   }, [
     state.profile,
@@ -179,97 +279,393 @@ export default function DashboardStep() {
 
   const handleDownloadPdf = useCallback(async () => {
     if (!summaryData) return;
-    const { jsPDF } = await import("jspdf");
-    const doc = new jsPDF();
+    const [{ jsPDF }, autoTableModule] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
 
-    doc.setFontSize(16);
-    doc.text("Career Navigator Summary", 14, 20);
-
-    let cursorY = 30;
+    const autoTable: any = (autoTableModule as any).default || autoTableModule;
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 14;
 
-    const ensureSpace = (height: number) => {
-      if (cursorY + height <= pageHeight - 20) return;
+    const formatText = (value: string | number | null | undefined) =>
+      String(value ?? "").replace(/[–—]/g, "-").replace(/→/g, "->").replace(/[•·]/g, "-");
+
+    // Header band
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, pageWidth, 32, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.text("Career Navigator Executive Summary", margin, 17);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date(summaryData.generatedAt).toLocaleString()}`, margin, 24);
+    doc.text(`Dream Role: ${formatText(summaryData.dreamRole?.title || "N/A")}`, margin, 29);
+
+    doc.setTextColor(33, 37, 41);
+    doc.setFontSize(11);
+    let cursorY = 40;
+
+    const ensureSpace = (space: number) => {
+      if (cursorY + space <= pageHeight - margin) return;
       doc.addPage();
-      cursorY = 20;
-      doc.setFontSize(11);
+      cursorY = margin;
     };
 
-    const addSection = (title: string, lines: string[]) => {
-      if (!lines.length) return;
-      ensureSpace(12);
-      doc.setFontSize(13);
-      doc.text(title, 14, cursorY);
+    const sectionHeading = (title: string, subtitle?: string) => {
+      ensureSpace(subtitle ? 16 : 12);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(37, 99, 235);
+      doc.text(formatText(title), margin, cursorY);
       cursorY += 6;
-      doc.setFontSize(11);
-      const wrapped = doc.splitTextToSize(lines.join("\n"), 180);
-      wrapped.forEach((line) => {
-        ensureSpace(6);
-        doc.text(line, 14, cursorY);
+      if (subtitle) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139);
+        doc.text(formatText(subtitle), margin, cursorY);
         cursorY += 5;
+      }
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(33, 37, 41);
+    };
+
+    const metricCards = (
+      metrics: { label: string; value: string; accent?: [number, number, number] }[],
+      rows: number
+    ) => {
+      const cardsPerRow = Math.min(metrics.length, 3);
+      const gap = 4;
+      const cardWidth = (pageWidth - margin * 2 - gap * (cardsPerRow - 1)) / cardsPerRow;
+      const cardHeight = 20;
+
+      for (let row = 0; row < rows; row++) {
+        const rowMetrics = metrics.slice(row * cardsPerRow, (row + 1) * cardsPerRow);
+        if (!rowMetrics.length) continue;
+        ensureSpace(cardHeight + 6);
+        rowMetrics.forEach((metric, index) => {
+          const x = margin + index * (cardWidth + gap);
+          doc.setFillColor(248, 250, 252);
+          doc.roundedRect(x, cursorY, cardWidth, cardHeight, 3, 3, "F");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(12);
+          doc.setTextColor(15, 23, 42);
+          doc.text(formatText(metric.value), x + 4, cursorY + 9);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          const color = metric.accent ?? [148, 163, 184];
+          doc.setTextColor(color[0], color[1], color[2]);
+          doc.text(formatText(metric.label), x + 4, cursorY + 16);
+        });
+        cursorY += cardHeight + 6;
+        doc.setTextColor(33, 37, 41);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+      }
+    };
+
+    const bulletList = (items: string[]) => {
+      if (!items.length) return;
+      ensureSpace(items.length * 6 + 6);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(55, 65, 81);
+      items.forEach((item) => {
+        doc.setFillColor(59, 130, 246);
+        doc.circle(margin + 1.5, cursorY - 2, 0.8, "F");
+        doc.text(formatText(item), margin + 5, cursorY);
+        cursorY += 5.5;
       });
       cursorY += 3;
+      doc.setTextColor(33, 37, 41);
     };
 
-    addSection("Profile", [
-      `Name: ${summaryData.profile?.name || "N/A"}`,
-      `Email: ${summaryData.profile?.email || "N/A"}`,
-      `Experience: ${summaryData.profile?.experience || "Not provided"}`,
-      `Education: ${summaryData.profile?.education || "Not provided"}`,
-      summaryData.profile?.githubUrl ? `GitHub: ${summaryData.profile.githubUrl}` : "",
-      summaryData.profile?.linkedinUrl ? `LinkedIn: ${summaryData.profile.linkedinUrl}` : "",
-    ].filter(Boolean));
+    const timelineList = (
+      items: {
+        day: number;
+        title: string;
+        skill: string;
+        hours: number;
+        checkpoint: boolean;
+      }[]
+    ) => {
+      if (!items.length) return;
+      items.forEach((item) => {
+        ensureSpace(14);
+        const isCheckpoint = item.checkpoint;
+        doc.setFillColor(isCheckpoint ? 254 : 241, isCheckpoint ? 226 : 245, isCheckpoint ? 226 : 249);
+        doc.roundedRect(margin, cursorY - 5, pageWidth - margin * 2, 12, 2, 2, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(30, 64, 175);
+        doc.text(
+          formatText(`Day ${item.day}: ${item.title}`),
+          margin + 4,
+          cursorY + 0.5
+        );
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(71, 85, 105);
+        const meta = `Focus: ${item.skill}  ·  ${item.hours}h${item.checkpoint ? "  ·  Checkpoint" : ""}`;
+        doc.text(formatText(meta), margin + 4, cursorY + 5.5);
+        cursorY += 12;
+        doc.setTextColor(33, 37, 41);
+      });
+      cursorY += 2;
+    };
 
-    addSection("Dream Role", [
-      `Title: ${summaryData.dreamRole?.title || "N/A"}`,
-      summaryData.dreamRole?.company ? `Target Company: ${summaryData.dreamRole.company}` : "",
-      summaryData.dreamRole?.salaryRange ? `Salary Range: ${summaryData.dreamRole.salaryRange}` : "",
-      summaryData.dreamRole?.demandLevel ? `Market Demand: ${summaryData.dreamRole.demandLevel}` : "",
-    ].filter(Boolean));
-
-    if (summaryData.roadmapSummary) {
-      addSection("Active Roadmap", [
-        `Duration: ${summaryData.roadmapSummary.durationDays} days`,
-        `Total Hours: ${summaryData.roadmapSummary.totalHours}h`,
-        `Milestones: ${summaryData.roadmapSummary.checkpointCount}`,
-      ]);
-
-      const milestoneLines = summaryData.roadmapSummary.milestones.map(
-        (milestone) => `Day ${milestone.day}: ${milestone.title}`
-      );
-      addSection("Key Milestones", milestoneLines);
-    }
-
-    addSection(
-      "Progress Snapshot",
+    // Sections
+    sectionHeading("Profile Snapshot", "Core identity and target role context");
+    metricCards(
       [
-        `Completed Days: ${summaryData.progress.completedDays} / ${summaryData.progress.totalDays}`,
-        `Completion: ${summaryData.progress.completionPercent}%`,
-        `Logged Hours: ${summaryData.progress.completedHours}h`,
-        `Active Streak: ${summaryData.progress.streak} day(s)`,
-        summaryData.progress.nextMilestone
-          ? `Next Milestone: Day ${summaryData.progress.nextMilestone.day} · ${summaryData.progress.nextMilestone.title}`
-          : "",
-      ].filter(Boolean)
+        {
+          label: "Profile",
+          value: summaryData.profile?.name || "N/A",
+          accent: [37, 99, 235],
+        },
+        {
+          label: "Dream Role",
+          value: summaryData.dreamRole?.title || "Not Defined",
+          accent: [30, 64, 175],
+        },
+        {
+          label: "Demand",
+          value: summaryData.dreamRole?.demandLevel || "Unknown",
+          accent: [249, 115, 22],
+        },
+      ],
+      1
     );
 
-    if (summaryData.skillHighlights.length) {
-      addSection(
-        "Priority Skill Gaps",
-        summaryData.skillHighlights.map(
-          (highlight) =>
-            `${highlight.skill} (${highlight.priority}) — ${highlight.currentLevel} → ${highlight.targetLevel}`
-        )
+    const contactLines = [
+      summaryData.profile?.email ? `Email: ${summaryData.profile.email}` : "",
+      summaryData.profile?.githubUrl ? `GitHub: ${summaryData.profile.githubUrl}` : "",
+      summaryData.profile?.linkedinUrl ? `LinkedIn: ${summaryData.profile.linkedinUrl}` : "",
+    ].filter(Boolean);
+    if (contactLines.length) {
+      ensureSpace(contactLines.length * 5 + 6);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      contactLines.forEach((line) => {
+        doc.text(formatText(line), margin, cursorY + 2);
+        cursorY += 5;
+      });
+      cursorY += 4;
+      doc.setFontSize(11);
+      doc.setTextColor(33, 37, 41);
+    }
+
+    if (summaryData.roadmapSummary) {
+      metricCards(
+        [
+          {
+            label: "Roadmap Duration",
+            value: `${summaryData.roadmapSummary.durationDays} days`,
+            accent: [14, 165, 233],
+          },
+          {
+            label: "Total Guided Hours",
+            value: `${summaryData.roadmapSummary.totalHours}h`,
+            accent: [56, 189, 248],
+          },
+          {
+            label: "Milestones",
+            value: `${summaryData.roadmapSummary.checkpointCount}`,
+            accent: [59, 130, 246],
+          },
+        ],
+        1
       );
+    }
+
+    sectionHeading("Progress Pulse", summaryData.readiness.narrative);
+    metricCards(
+      [
+        {
+          label: "Completion",
+          value: `${summaryData.progress.completionPercent}%`,
+          accent: [59, 130, 246],
+        },
+        {
+          label: "Hours Logged",
+          value: `${summaryData.progress.completedHours}h`,
+          accent: [249, 115, 22],
+        },
+        {
+          label: "Active Streak",
+          value: `${summaryData.progress.streak} day${summaryData.progress.streak === 1 ? "" : "s"}`,
+          accent: [16, 185, 129],
+        },
+      ],
+      1
+    );
+
+    metricCards(
+      [
+        {
+          label: "Critical Gaps",
+          value: `${summaryData.metrics.criticalGapCount}`,
+          accent: [220, 38, 38],
+        },
+        {
+          label: "Important Gaps",
+          value: `${summaryData.metrics.importantGapCount}`,
+          accent: [234, 179, 8],
+        },
+        {
+          label: "Skills Already Met",
+          value: `${summaryData.metrics.skillsMet}`,
+          accent: [16, 185, 129],
+        },
+      ],
+      1
+    );
+
+    if (summaryData.progress.nextMilestone) {
+      ensureSpace(18);
+      doc.setFillColor(240, 249, 255);
+      doc.roundedRect(margin, cursorY - 4, pageWidth - margin * 2, 16, 3, 3, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(30, 64, 175);
+      doc.text(
+        formatText(
+          `Next Milestone · Day ${summaryData.progress.nextMilestone.day}: ${summaryData.progress.nextMilestone.title}`
+        ),
+        margin + 4,
+        cursorY + 3
+      );
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.text("Stay on pace to unlock the subsequent sprint planning prompt.", margin + 4, cursorY + 9);
+      cursorY += 18;
+      doc.setTextColor(33, 37, 41);
+    }
+
+    if (summaryData.recommendedActions.length) {
+      sectionHeading("Recommended Actions", "Agent suggestions for the next 7-day cycle");
+      bulletList(summaryData.recommendedActions);
+    }
+
+    if (summaryData.upcomingTasks.length) {
+      sectionHeading("Upcoming Focus Window", "Next five roadmap checkpoints");
+      timelineList(summaryData.upcomingTasks);
+    }
+
+    if (summaryData.skillHighlights.length) {
+      sectionHeading("Priority Skill Gaps");
+      autoTable(doc, {
+        startY: cursorY,
+        head: [["Skill", "Priority", "Current", "Target"]],
+        body: summaryData.skillHighlights.map((highlight) => [
+          formatText(highlight.skill),
+          formatText(highlight.priority),
+          formatText(highlight.currentLevel),
+          formatText(highlight.targetLevel),
+        ]),
+        theme: "grid",
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: 255,
+          fontSize: 10,
+        },
+        bodyStyles: {
+          fontSize: 9,
+          textColor: [55, 65, 81],
+        },
+        styles: {
+          cellPadding: 2.5,
+        },
+      });
+      const tableFinalY = ((doc as any).lastAutoTable?.finalY as number | undefined) ?? cursorY;
+      cursorY = tableFinalY + 8;
+    }
+
+    if (summaryData.focusAreas.length) {
+      sectionHeading("Key Focus Themes");
+      summaryData.focusAreas.forEach((area) => {
+        ensureSpace(16);
+        doc.setFillColor(247, 254, 231);
+        doc.roundedRect(margin, cursorY - 5, pageWidth - margin * 2, 14, 2, 2, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(77, 124, 15);
+        doc.text(formatText(area.skill), margin + 4, cursorY + 1);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(87, 83, 78);
+        const descriptor = `${area.emphasisDays} day${area.emphasisDays === 1 ? "" : "s"} of emphasis · ${area.priority.toUpperCase()} priority`;
+        doc.text(formatText(descriptor), margin + 4, cursorY + 6);
+        cursorY += 14;
+        doc.setTextColor(33, 37, 41);
+      });
+      cursorY += 2;
+    }
+
+    if (summaryData.growthOpportunities.length) {
+      sectionHeading("Growth Opportunities", "High-leverage skills with dedicated hours inside your plan");
+      autoTable(doc, {
+        startY: cursorY,
+        head: [["Skill", "Priority", "Target Level", "Allocated Hours"]],
+        body: summaryData.growthOpportunities.map((opportunity) => [
+          formatText(opportunity.skill),
+          formatText(opportunity.priority),
+          formatText(opportunity.targetLevel),
+          formatText(`${opportunity.supportHours.toFixed(1)}h`),
+        ]),
+        theme: "striped",
+        headStyles: {
+          fillColor: [16, 185, 129],
+          textColor: 255,
+          fontSize: 10,
+        },
+        styles: {
+          cellPadding: 2.5,
+          fontSize: 9,
+        },
+        bodyStyles: {
+          textColor: [55, 65, 81],
+        },
+        alternateRowStyles: {
+          fillColor: [240, 253, 244],
+        },
+      });
+      const tableFinalY = ((doc as any).lastAutoTable?.finalY as number | undefined) ?? cursorY;
+      cursorY = tableFinalY + 8;
     }
 
     if (summaryData.multiDurationVariants.length) {
-      addSection(
-        "Extended Roadmap Options",
-        summaryData.multiDurationVariants.map(
-          (variant) => `${variant.durationDays} days · ${variant.totalHours}h · ${variant.milestoneCount} milestones`
-        )
-      );
+      sectionHeading("Extended Roadmap Options", "Choose deeper runway timelines when you need more space to level up");
+      autoTable(doc, {
+        startY: cursorY,
+        head: [["Duration", "Approx Hours", "Milestones"]],
+        body: summaryData.multiDurationVariants.map((variant) => [
+          formatText(`${variant.durationDays} days`),
+          formatText(`${variant.totalHours}h`),
+          formatText(`${variant.milestoneCount}`),
+        ]),
+        theme: "grid",
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: 255,
+          fontSize: 10,
+        },
+        bodyStyles: {
+          textColor: [55, 65, 81],
+          fontSize: 9,
+        },
+        styles: {
+          cellPadding: 2.5,
+        },
+      });
+      const tableFinalY = ((doc as any).lastAutoTable?.finalY as number | undefined) ?? cursorY;
+      cursorY = tableFinalY + 8;
     }
 
     doc.save("career-summary.pdf");
