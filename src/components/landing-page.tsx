@@ -1,0 +1,266 @@
+"use client";
+
+import { useCareer } from "@/lib/career-context";
+import { Button } from "@/components/ui/button";
+import {
+  Brain,
+  Target,
+  Map,
+  Sparkles,
+  ArrowRight,
+  BarChart3,
+  GitBranch,
+  Compass,
+  CheckCircle2,
+  Zap,
+} from "lucide-react";
+
+const features = [
+  {
+    icon: Brain,
+    title: "Skill Extraction",
+    description: "Analyzes your resume, GitHub, and LinkedIn to extract structured skills from unstructured profiles.",
+  },
+  {
+    icon: Target,
+    title: "Market Alignment",
+    description: "Maps real-world job requirements to identify missing competencies for your dream role.",
+  },
+  {
+    icon: GitBranch,
+    title: "Gap Analysis",
+    description: "Identifies concrete skill gaps -- both technical and non-technical -- with priority rankings.",
+  },
+  {
+    icon: Map,
+    title: "30-Day Roadmap",
+    description: "Generates a personalized Vibe-Check learning plan with projects, resources, and checkpoints.",
+  },
+  {
+    icon: Zap,
+    title: "Agentic Planning",
+    description: "Multi-step reasoning agent that plans, evaluates progress, and adapts recommendations.",
+  },
+  {
+    icon: BarChart3,
+    title: "Progress Tracking",
+    description: "Track your journey with interactive dashboards, milestones, and weekly goal reviews.",
+  },
+];
+
+const steps = [
+  { number: "01", title: "Upload Your Profile", description: "Paste your resume, share GitHub/LinkedIn links" },
+  { number: "02", title: "Choose Dream Role", description: "Select your target role from market data" },
+  { number: "03", title: "AI Analysis", description: "Agent extracts skills, maps gaps, reasons through plan" },
+  { number: "04", title: "Get Your Roadmap", description: "Receive a personalized 30-day learning path" },
+];
+
+export default function LandingPage() {
+  const { setCurrentStep } = useCareer();
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Nav */}
+      <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+              <Compass className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <span className="text-lg font-bold">Career Navigator</span>
+          </div>
+          <Button onClick={() => setCurrentStep("profile")} size="sm">
+            Get Started <ArrowRight className="ml-1 h-4 w-4" />
+          </Button>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
+        <div className="absolute top-20 left-1/4 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute bottom-20 right-1/4 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
+
+        <div className="relative mx-auto max-w-6xl px-6 pb-20 pt-24 text-center">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary">
+            <Sparkles className="h-4 w-4" />
+            AI-Powered Career Intelligence
+          </div>
+
+          <h1 className="mx-auto max-w-4xl text-5xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl">
+            Your Personal{" "}
+            <span className="gradient-text">Career Co-Pilot</span>
+          </h1>
+
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
+            An agentic AI system that actively manages your professional growth.
+            It reasons, plans, and outputs actions -- not static advice.
+          </p>
+
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Button
+              size="lg"
+              className="h-12 min-w-[200px] text-base glow-primary"
+              onClick={() => setCurrentStep("profile")}
+            >
+              Start Your Journey
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="h-12 min-w-[200px] text-base"
+              onClick={() => {
+                document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              Learn More
+            </Button>
+          </div>
+
+          {/* Stats */}
+          <div className="mx-auto mt-16 grid max-w-2xl grid-cols-3 gap-8">
+            {[
+              { value: "40+", label: "Skills Tracked" },
+              { value: "10+", label: "Dream Roles" },
+              { value: "30", label: "Day Roadmap" },
+            ].map((stat) => (
+              <div key={stat.label} className="text-center">
+                <div className="text-3xl font-bold gradient-text">{stat.value}</div>
+                <div className="mt-1 text-sm text-muted-foreground">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="border-t border-border/50 bg-muted/30 py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold md:text-4xl">How It Works</h2>
+            <p className="mt-3 text-muted-foreground">Four steps to your personalized career roadmap</p>
+          </div>
+
+          <div className="mt-14 grid gap-6 md:grid-cols-4">
+            {steps.map((step, i) => (
+              <div key={step.number} className="relative">
+                {i < steps.length - 1 && (
+                  <div className="absolute right-0 top-8 hidden h-0.5 w-full translate-x-1/2 bg-gradient-to-r from-primary/30 to-transparent md:block" />
+                )}
+                <div className="relative rounded-xl border border-border/50 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg">
+                  <div className="mb-4 text-4xl font-bold text-primary/20">{step.number}</div>
+                  <h3 className="text-lg font-semibold">{step.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{step.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section id="features" className="py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold md:text-4xl">Agentic Career Intelligence</h2>
+            <p className="mt-3 text-muted-foreground">
+              Not a chatbot. A reasoning engine that adapts to your growth.
+            </p>
+          </div>
+
+          <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {features.map((feature) => (
+              <div
+                key={feature.title}
+                className="group rounded-xl border border-border/50 bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg"
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+                  <feature.icon className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold">{feature.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Agent Reasoning */}
+      <section className="border-t border-border/50 bg-muted/30 py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="grid items-center gap-12 md:grid-cols-2">
+            <div>
+              <h2 className="text-3xl font-bold md:text-4xl">Multi-Step Agent Reasoning</h2>
+              <p className="mt-4 text-muted-foreground leading-relaxed">
+                Unlike static career tools, our AI agent follows a structured reasoning pipeline.
+                It analyzes, plans, executes, evaluates, and adapts -- continuously improving your roadmap
+                based on your progress and changing market demands.
+              </p>
+              <div className="mt-8 space-y-4">
+                {[
+                  "Extracts structured skills from unstructured data",
+                  "Maps gaps against real job market requirements",
+                  "Generates adaptive learning paths with checkpoints",
+                  "Evaluates progress and adjusts recommendations",
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+                    <span className="text-sm">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border/50 bg-card p-6">
+              <div className="space-y-3">
+                {[
+                  { step: "Analyze", desc: "Parse profile data & extract skills", color: "bg-blue-500" },
+                  { step: "Plan", desc: "Map gaps & prioritize learning paths", color: "bg-purple-500" },
+                  { step: "Execute", desc: "Generate roadmap with resources", color: "bg-emerald-500" },
+                  { step: "Evaluate", desc: "Track progress against milestones", color: "bg-amber-500" },
+                  { step: "Adapt", desc: "Adjust plan based on performance", color: "bg-rose-500" },
+                ].map((item, i) => (
+                  <div key={item.step} className="flex items-center gap-4 rounded-lg border border-border/50 bg-background p-4">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${item.color} text-white text-sm font-bold`}>
+                      {i + 1}
+                    </div>
+                    <div>
+                      <div className="font-semibold">{item.step}</div>
+                      <div className="text-sm text-muted-foreground">{item.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-20">
+        <div className="mx-auto max-w-6xl px-6 text-center">
+          <h2 className="text-3xl font-bold md:text-4xl">Ready to Navigate Your Career?</h2>
+          <p className="mx-auto mt-4 max-w-lg text-muted-foreground">
+            Start with your profile and let the AI agent chart your personalized path to your dream role.
+          </p>
+          <Button
+            size="lg"
+            className="mt-8 h-12 min-w-[240px] text-base glow-primary"
+            onClick={() => setCurrentStep("profile")}
+          >
+            Launch Career Navigator
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-border/50 py-8">
+        <div className="mx-auto max-w-6xl px-6 text-center text-sm text-muted-foreground">
+          Career Navigator -- AI-Powered Career Co-Pilot
+        </div>
+      </footer>
+    </div>
+  );
+}
