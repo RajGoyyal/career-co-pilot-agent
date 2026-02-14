@@ -54,8 +54,8 @@ const stepConfigs = [
   {
     id: "generate-roadmap",
     type: "adapt" as const,
-    title: "Generating 30-Day Roadmap",
-    description: "Building your personalized Vibe-Check learning plan with projects and checkpoints...",
+    title: "Generating Personalized Roadmap",
+    description: "Building flexible learning paths with checkpoints across multiple timelines...",
     icon: Map,
   },
 ];
@@ -288,7 +288,7 @@ export default function AnalysisStep() {
 
             <div className="flex justify-center">
               <Button size="lg" className="h-12 min-w-[260px] text-base glow-primary" onClick={() => setCurrentStep("roadmap")}>
-                View Your 30-Day Roadmap
+                View Your Roadmap
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </div>

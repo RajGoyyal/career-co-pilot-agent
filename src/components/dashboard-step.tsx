@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useCareer } from "@/lib/career-context";
-import { getLevelLabel, getPriorityColor } from "@/lib/career-engine";
+import { generateRoadmap, getLevelLabel, getPriorityColor } from "@/lib/career-engine";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +30,11 @@ import {
   TrendingUp,
   RotateCcw,
   Map,
+  FileJson,
+  FileText,
 } from "lucide-react";
+
+const VARIANT_DURATIONS = [60, 90, 120, 180];
 
 export default function DashboardStep() {
   const { state, setCurrentStep, toggleDayComplete, resetState } = useCareer();
@@ -79,6 +83,197 @@ export default function DashboardStep() {
     if (!state.roadmap) return null;
     return state.roadmap.milestones.find((m) => !state.completedDays.includes(m.day));
   }, [state.roadmap, state.completedDays]);
+
+  const variantSnapshots = useMemo(() => {
+    if (!state.profile || !state.dreamRole || !state.skillGaps.length) return [];
+    return VARIANT_DURATIONS.map((duration) => {
+      const variant = generateRoadmap(state.skillGaps, state.profile!, state.dreamRole!, {
+        durationDays: duration,
+      });
+      return {
+        durationDays: variant.durationDays,
+        totalHours: Math.round(variant.totalHours),
+        milestones: variant.milestones,
+      };
+    });
+  }, [state.profile, state.dreamRole, state.skillGaps]);
+
+  const summaryData = useMemo(() => {
+    if (!state.profile || !state.dreamRole) return null;
+
+    const topGaps = state.skillGaps.filter((gap) => gap.gap > 0).slice(0, 5);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      profile: {
+        name: state.profile.name,
+        email: state.profile.email,
+        experience: state.profile.experience,
+        education: state.profile.education,
+        githubUrl: state.profile.githubUrl,
+        linkedinUrl: state.profile.linkedinUrl,
+      },
+      dreamRole: {
+        title: state.dreamRole.title,
+        company: state.dreamRole.company,
+        demandLevel: state.dreamRole.demandLevel,
+        salaryRange: state.dreamRole.salaryRange,
+      },
+      roadmapSummary: state.roadmap
+        ? {
+            durationDays: state.roadmap.durationDays,
+            totalHours: Number(state.roadmap.totalHours.toFixed(1)),
+            checkpointCount: state.roadmap.milestones.length,
+            milestones: state.roadmap.milestones,
+          }
+        : null,
+      multiDurationVariants: variantSnapshots.map((variant) => ({
+        durationDays: variant.durationDays,
+        totalHours: variant.totalHours,
+        milestoneCount: variant.milestones.length,
+      })),
+      progress: {
+        completedDays: completedCount,
+        totalDays,
+        completionPercent: Number(progressPercent.toFixed(1)),
+        completedHours: Number(completedHours.toFixed(1)),
+        streak: currentStreak,
+        nextMilestone: nextMilestone
+          ? { title: nextMilestone.title, day: nextMilestone.day }
+          : null,
+      },
+      skillHighlights: topGaps.map((gap) => ({
+        skill: gap.skill,
+        priority: gap.priority,
+        currentLevel: getLevelLabel(gap.currentLevel),
+        targetLevel: getLevelLabel(gap.requiredLevel),
+      })),
+    };
+  }, [
+    state.profile,
+    state.dreamRole,
+    state.skillGaps,
+    state.roadmap,
+    variantSnapshots,
+    completedCount,
+    totalDays,
+    progressPercent,
+    completedHours,
+    currentStreak,
+    nextMilestone,
+  ]);
+
+  const handleDownloadJson = useCallback(() => {
+    if (!summaryData) return;
+    const data = JSON.stringify(summaryData, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "career-summary.json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [summaryData]);
+
+  const handleDownloadPdf = useCallback(async () => {
+    if (!summaryData) return;
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text("Career Navigator Summary", 14, 20);
+
+    let cursorY = 30;
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    const ensureSpace = (height: number) => {
+      if (cursorY + height <= pageHeight - 20) return;
+      doc.addPage();
+      cursorY = 20;
+      doc.setFontSize(11);
+    };
+
+    const addSection = (title: string, lines: string[]) => {
+      if (!lines.length) return;
+      ensureSpace(12);
+      doc.setFontSize(13);
+      doc.text(title, 14, cursorY);
+      cursorY += 6;
+      doc.setFontSize(11);
+      const wrapped = doc.splitTextToSize(lines.join("\n"), 180);
+      wrapped.forEach((line) => {
+        ensureSpace(6);
+        doc.text(line, 14, cursorY);
+        cursorY += 5;
+      });
+      cursorY += 3;
+    };
+
+    addSection("Profile", [
+      `Name: ${summaryData.profile?.name || "N/A"}`,
+      `Email: ${summaryData.profile?.email || "N/A"}`,
+      `Experience: ${summaryData.profile?.experience || "Not provided"}`,
+      `Education: ${summaryData.profile?.education || "Not provided"}`,
+      summaryData.profile?.githubUrl ? `GitHub: ${summaryData.profile.githubUrl}` : "",
+      summaryData.profile?.linkedinUrl ? `LinkedIn: ${summaryData.profile.linkedinUrl}` : "",
+    ].filter(Boolean));
+
+    addSection("Dream Role", [
+      `Title: ${summaryData.dreamRole?.title || "N/A"}`,
+      summaryData.dreamRole?.company ? `Target Company: ${summaryData.dreamRole.company}` : "",
+      summaryData.dreamRole?.salaryRange ? `Salary Range: ${summaryData.dreamRole.salaryRange}` : "",
+      summaryData.dreamRole?.demandLevel ? `Market Demand: ${summaryData.dreamRole.demandLevel}` : "",
+    ].filter(Boolean));
+
+    if (summaryData.roadmapSummary) {
+      addSection("Active Roadmap", [
+        `Duration: ${summaryData.roadmapSummary.durationDays} days`,
+        `Total Hours: ${summaryData.roadmapSummary.totalHours}h`,
+        `Milestones: ${summaryData.roadmapSummary.checkpointCount}`,
+      ]);
+
+      const milestoneLines = summaryData.roadmapSummary.milestones.map(
+        (milestone) => `Day ${milestone.day}: ${milestone.title}`
+      );
+      addSection("Key Milestones", milestoneLines);
+    }
+
+    addSection(
+      "Progress Snapshot",
+      [
+        `Completed Days: ${summaryData.progress.completedDays} / ${summaryData.progress.totalDays}`,
+        `Completion: ${summaryData.progress.completionPercent}%`,
+        `Logged Hours: ${summaryData.progress.completedHours}h`,
+        `Active Streak: ${summaryData.progress.streak} day(s)`,
+        summaryData.progress.nextMilestone
+          ? `Next Milestone: Day ${summaryData.progress.nextMilestone.day} · ${summaryData.progress.nextMilestone.title}`
+          : "",
+      ].filter(Boolean)
+    );
+
+    if (summaryData.skillHighlights.length) {
+      addSection(
+        "Priority Skill Gaps",
+        summaryData.skillHighlights.map(
+          (highlight) =>
+            `${highlight.skill} (${highlight.priority}) — ${highlight.currentLevel} → ${highlight.targetLevel}`
+        )
+      );
+    }
+
+    if (summaryData.multiDurationVariants.length) {
+      addSection(
+        "Extended Roadmap Options",
+        summaryData.multiDurationVariants.map(
+          (variant) => `${variant.durationDays} days · ${variant.totalHours}h · ${variant.milestoneCount} milestones`
+        )
+      );
+    }
+
+    doc.save("career-summary.pdf");
+  }, [summaryData]);
 
   if (!state.roadmap) {
     return (
@@ -281,7 +476,7 @@ export default function DashboardStep() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <Calendar className="h-5 w-5 text-primary" />
-                      30-Day Calendar
+                      {state.roadmap.durationDays}-Day Calendar
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -410,7 +605,7 @@ export default function DashboardStep() {
                       <Trophy className="h-5 w-5" /> Roadmap Complete!
                     </div>
                     <p className="text-muted-foreground">
-                      Congratulations! You have completed your 30-day learning roadmap. You are ready to confidently pursue {state.dreamRole?.title} roles.
+                      Congratulations! You have completed your learning roadmap. You are ready to confidently pursue {state.dreamRole?.title} roles.
                     </p>
                   </div>
                 )}
@@ -423,6 +618,24 @@ export default function DashboardStep() {
                 <CardTitle className="text-lg">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  size="sm"
+                  onClick={handleDownloadPdf}
+                  disabled={!summaryData}
+                >
+                  <FileText className="mr-2 h-4 w-4" /> Download Summary PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  size="sm"
+                  onClick={handleDownloadJson}
+                  disabled={!summaryData}
+                >
+                  <FileJson className="mr-2 h-4 w-4" /> Download Summary JSON
+                </Button>
                 <Button className="w-full justify-start" size="sm" onClick={() => setCurrentStep("landing")}>
                   <Compass className="mr-2 h-4 w-4" /> Launch Career Navigator
                 </Button>

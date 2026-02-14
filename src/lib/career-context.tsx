@@ -69,6 +69,7 @@ export interface Roadmap {
   totalHours: number;
   weeklyGoals: string[];
   milestones: { day: number; title: string; description: string }[];
+  durationDays: number;
 }
 
 export interface AgentStep {

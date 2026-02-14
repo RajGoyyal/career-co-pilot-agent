@@ -348,8 +348,18 @@ const PROJECT_IDEAS: Record<string, string[]> = {
   "Problem Solving": ["Solve 30 LeetCode problems", "Complete a coding challenge", "Debug a complex production issue"],
 };
 
-// Generate a 30-day personalized roadmap
-export function generateRoadmap(skillGaps: SkillGap[], profile: ProfileData, dreamRole: DreamRole): Roadmap {
+interface GenerateRoadmapOptions {
+  durationDays?: number;
+}
+
+// Generate a personalized roadmap for configurable durations
+export function generateRoadmap(
+  skillGaps: SkillGap[],
+  profile: ProfileData,
+  dreamRole: DreamRole,
+  options: GenerateRoadmapOptions = {}
+): Roadmap {
+  const durationDays = Math.max(14, Math.min(options.durationDays ?? 30, 210));
   const criticalGaps = skillGaps.filter((g) => g.priority === "critical" && g.gap > 0);
   const importantGaps = skillGaps.filter((g) => g.priority === "important" && g.gap > 0);
   const niceToHaveGaps = skillGaps.filter((g) => g.priority === "nice-to-have" && g.gap > 0);
@@ -357,24 +367,93 @@ export function generateRoadmap(skillGaps: SkillGap[], profile: ProfileData, dre
   const allGaps = [...criticalGaps, ...importantGaps, ...niceToHaveGaps];
   const days: RoadmapDay[] = [];
 
-  const weeklyGoals = [
-    "Foundation: Assess current skills and set up learning environment",
-    "Core Skills: Deep dive into critical skill gaps",
-    "Applied Learning: Build projects and practice",
-    "Integration: Combine skills and prepare for roles",
+  const totalWeeks = Math.ceil(durationDays / 7);
+  const phaseGoals = [
+    {
+      title: "Foundation & Baseline",
+      detail: "Assess strengths, set expectations, and prime learning workflows",
+    },
+    {
+      title: "Critical Skill Deep Dive",
+      detail: "Close top skill gaps with structured lessons and deliberate practice",
+    },
+    {
+      title: "Applied Projects",
+      detail: "Convert learning into tangible deliverables with feedback loops",
+    },
+    {
+      title: "Systems Integration",
+      detail: "Blend complementary skills and simulate role realities",
+    },
+    {
+      title: "Portfolio & Narrative",
+      detail: "Document outcomes, refresh assets, and align storytelling",
+    },
+    {
+      title: "Interview & Outreach",
+      detail: "Rehearse interviews, activate networking, and ship applications",
+    },
   ];
 
-  const milestones = [
-    { day: 7, title: "Week 1 Complete", description: "Foundation skills assessed and learning environment ready" },
-    { day: 14, title: "Mid-Point Check", description: "Core technical skills progressing, first project started" },
-    { day: 21, title: "Week 3 Complete", description: "Applied learning projects completed, portfolio updated" },
-    { day: 30, title: "Roadmap Complete", description: "All skill gaps addressed, ready for applications" },
+  const weeklyGoals = Array.from({ length: totalWeeks }, (_, index) => {
+    if (totalWeeks <= phaseGoals.length) {
+      const phase = phaseGoals[Math.min(index, phaseGoals.length - 1)];
+      return `${phase.title}: ${phase.detail}`;
+    }
+
+    const normalized = totalWeeks > 1 ? index / (totalWeeks - 1) : 0;
+    const phaseIndex = Math.min(
+      phaseGoals.length - 1,
+      Math.round(normalized * (phaseGoals.length - 1))
+    );
+    const phase = phaseGoals[phaseIndex];
+    return `${phase.title}: ${phase.detail}`;
+  });
+
+  const milestoneTemplates = [
+    {
+      title: "Foundation Locked",
+      description: "Baseline assessment complete and learning environment established",
+    },
+    {
+      title: "Momentum Built",
+      description: "Core skill development underway with measurable progress",
+    },
+    {
+      title: "Portfolio In Motion",
+      description: "Applied projects producing evidence and feedback loops",
+    },
+    {
+      title: "Launch Ready",
+      description: "Narrative, assets, and outreach ready for opportunity windows",
+    },
   ];
 
-  for (let day = 1; day <= 30; day++) {
+  const milestonePercents = [0.25, 0.5, 0.75, 1];
+  const milestoneDays = new Set<number>();
+  const milestones = milestonePercents
+    .map((percent, index) => {
+      const rawDay = Math.round(durationDays * percent);
+      const day = Math.min(durationDays, Math.max(1, rawDay));
+      if (milestoneDays.has(day)) {
+        return null;
+      }
+      milestoneDays.add(day);
+      const template = milestoneTemplates[Math.min(index, milestoneTemplates.length - 1)];
+      return {
+        day,
+        title: template.title,
+        description: template.description,
+      };
+    })
+    .filter(Boolean) as Roadmap["milestones"];
+
+  const checkpointDays = new Set(milestones.map((m) => m.day));
+
+  for (let day = 1; day <= durationDays; day++) {
     const week = Math.ceil(day / 7);
     const dayInWeek = ((day - 1) % 7) + 1;
-    const isCheckpoint = day === 7 || day === 14 || day === 21 || day === 30;
+    const isCheckpoint = checkpointDays.has(day);
 
     // Distribute gaps across days
     const gapIndex = (day - 1) % Math.max(allGaps.length, 1);
@@ -478,7 +557,7 @@ export function generateRoadmap(skillGaps: SkillGap[], profile: ProfileData, dre
 
   const totalHours = days.reduce((sum, d) => sum + d.estimatedHours, 0);
 
-  return { days, totalHours, weeklyGoals, milestones };
+  return { days, totalHours, weeklyGoals, milestones, durationDays };
 }
 
 export function getLevelLabel(level: number): string {

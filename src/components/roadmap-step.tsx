@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCareer } from "@/lib/career-context";
-import { getPriorityColor } from "@/lib/career-engine";
+import { generateRoadmap, getPriorityColor } from "@/lib/career-engine";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,12 +23,49 @@ import {
   Sparkles,
 } from "lucide-react";
 
+const DURATION_OPTIONS = [
+  { label: "30 Days", value: 30 },
+  { label: "2 Months", value: 60 },
+  { label: "3 Months", value: 90 },
+  { label: "4 Months", value: 120 },
+  { label: "6 Months", value: 180 },
+];
+
+const DURATION_LABELS: Record<number, string> = {
+  30: "30-Day",
+  60: "2-Month",
+  90: "3-Month",
+  120: "4-Month",
+  180: "6-Month",
+};
+
 export default function RoadmapStep() {
   const { state, setCurrentStep } = useCareer();
-  const [selectedWeek, setSelectedWeek] = useState("1");
+  const baseRoadmap = state.roadmap;
+  const [selectedDuration, setSelectedDuration] = useState(() => baseRoadmap?.durationDays ?? 30);
+  const [selectedSegment, setSelectedSegment] = useState("segment-1");
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
 
-  const { roadmap } = state;
+  useEffect(() => {
+    setSelectedSegment("segment-1");
+  }, [selectedDuration]);
+
+  useEffect(() => {
+    setExpandedDay(null);
+  }, [selectedSegment, selectedDuration]);
+
+  const canGenerateVariants = Boolean(state.profile && state.dreamRole && state.skillGaps.length);
+
+  const roadmap = useMemo(() => {
+    if (!baseRoadmap) return null;
+    if (selectedDuration === baseRoadmap.durationDays) {
+      return baseRoadmap;
+    }
+    if (canGenerateVariants && state.profile && state.dreamRole) {
+      return generateRoadmap(state.skillGaps, state.profile, state.dreamRole, { durationDays: selectedDuration });
+    }
+    return baseRoadmap;
+  }, [baseRoadmap, canGenerateVariants, selectedDuration, state.skillGaps, state.profile, state.dreamRole]);
 
   if (!roadmap) {
     return (
@@ -39,7 +76,14 @@ export default function RoadmapStep() {
     );
   }
 
-  // roadmap is already destructured above
+  const durationLabel = DURATION_LABELS[selectedDuration] || `${selectedDuration}-Day`;
+  const viewMode = roadmap.durationDays <= 45 ? "week" : "month";
+  const segmentSize = viewMode === "week" ? 7 : 30;
+  const totalSegments = Math.ceil(roadmap.durationDays / segmentSize);
+
+  const handleDurationChange = (value: number) => {
+    setSelectedDuration(value);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -67,10 +111,24 @@ export default function RoadmapStep() {
             <Sparkles className="h-4 w-4" />
             Personalized for {state.profile?.name || "You"} → {state.dreamRole?.title}
           </div>
-          <h1 className="text-3xl font-bold">Your 30-Day Vibe-Check Roadmap</h1>
+          <h1 className="text-3xl font-bold">Your {durationLabel} Vibe-Check Roadmap</h1>
           <p className="mt-2 text-muted-foreground">
             {roadmap.totalHours.toFixed(0)} hours of curated learning across {roadmap.days.length} days
           </p>
+        </div>
+
+        <div className="mb-8 flex flex-wrap gap-2">
+          {DURATION_OPTIONS.map((option) => (
+            <Button
+              key={option.value}
+              variant={selectedDuration === option.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleDurationChange(option.value)}
+              disabled={!canGenerateVariants && option.value !== baseRoadmap?.durationDays}
+            >
+              {option.label}
+            </Button>
+          ))}
         </div>
 
         {/* Overview Cards */}
@@ -79,7 +137,7 @@ export default function RoadmapStep() {
             <CardContent className="flex items-center gap-3 py-4">
               <Calendar className="h-8 w-8 text-primary" />
               <div>
-                <div className="text-2xl font-bold">30</div>
+                <div className="text-2xl font-bold">{roadmap.durationDays}</div>
                 <div className="text-xs text-muted-foreground">Days</div>
               </div>
             </CardContent>
@@ -151,7 +209,7 @@ export default function RoadmapStep() {
               {roadmap.weeklyGoals.map((goal, i) => (
                 <div key={i} className="flex items-start gap-3 rounded-lg border border-border/50 p-3">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                    W{i + 1}
+                    {viewMode === "week" ? `W${i + 1}` : `S${i + 1}`}
                   </div>
                   <span className="text-sm">{goal}</span>
                 </div>
@@ -163,20 +221,28 @@ export default function RoadmapStep() {
         {/* Day-by-Day Breakdown */}
         <div className="mb-8">
           <h2 className="mb-4 text-xl font-bold">Day-by-Day Breakdown</h2>
-          <Tabs value={selectedWeek} onValueChange={setSelectedWeek}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="1">Week 1</TabsTrigger>
-              <TabsTrigger value="2">Week 2</TabsTrigger>
-              <TabsTrigger value="3">Week 3</TabsTrigger>
-              <TabsTrigger value="4">Week 4</TabsTrigger>
-              <TabsTrigger value="5">Week 5</TabsTrigger>
+          <Tabs value={selectedSegment} onValueChange={setSelectedSegment}>
+            <TabsList className="mb-4 flex flex-wrap gap-2">
+              {Array.from({ length: totalSegments }, (_, index) => {
+                const segmentId = `segment-${index + 1}`;
+                const label = viewMode === "week" ? `Week ${index + 1}` : `Month ${index + 1}`;
+                return (
+                  <TabsTrigger key={segmentId} value={segmentId} className="px-4">
+                    {label}
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
 
-            {["1", "2", "3", "4", "5"].map((week) => (
-              <TabsContent key={week} value={week} className="space-y-3">
-                {roadmap.days
-                  .filter((d) => d.week === parseInt(week))
-                  .map((day) => {
+            {Array.from({ length: totalSegments }, (_, index) => {
+              const startDay = index * segmentSize + 1;
+              const endDay = Math.min(roadmap.durationDays, (index + 1) * segmentSize);
+              const segmentId = `segment-${index + 1}`;
+              const segmentDays = roadmap.days.filter((d) => d.day >= startDay && d.day <= endDay);
+
+              return (
+                <TabsContent key={segmentId} value={segmentId} className="space-y-3">
+                  {segmentDays.map((day) => {
                     const isExpanded = expandedDay === day.day;
                     const gap = state.skillGaps.find((g) => g.skill === day.skillFocus);
 
@@ -278,8 +344,9 @@ export default function RoadmapStep() {
                       </Card>
                     );
                   })}
-              </TabsContent>
-            ))}
+                </TabsContent>
+              );
+            })}
           </Tabs>
         </div>
 

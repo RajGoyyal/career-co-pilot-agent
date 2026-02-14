@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useCareer } from "@/lib/career-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -116,6 +116,8 @@ export default function LandingPage() {
   const { setCurrentStep } = useCareer();
   const [selectedFeature, setSelectedFeature] = useState<FeatureCard | null>(null);
   const [featureDialogOpen, setFeatureDialogOpen] = useState(false);
+  const marketPulseFeature = useMemo(() => features.find((f) => f.title === "Market Pulse") ?? null, []);
+  const roleTemplatesFeature = useMemo(() => features.find((f) => f.title === "Role-Based Templates") ?? null, []);
 
   const handleFeatureOpen = (feature: FeatureCard) => {
     if (!feature.priority) return;
@@ -329,6 +331,142 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {marketPulseFeature && (
+        <section className="border-t border-border/50 bg-muted/40 py-20">
+          <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 lg:flex-row">
+            <div className="lg:w-5/12">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+                <Radar className="h-4 w-4" aria-hidden="true" /> Market Pulse Radar
+              </div>
+              <h2 className="mt-4 text-3xl font-bold md:text-4xl">Stay Ahead With Live Hiring Signals</h2>
+              <p className="mt-3 text-muted-foreground">
+                The Market Pulse Radar continuously scans job feeds, salary datasets, and industry chatter to keep your roadmap aligned with demand.
+              </p>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {["Demand Indicators", "Compensation Bands", "Skill Trend Alerts", "Regional Heatmaps"].map((item) => (
+                  <div key={item} className="rounded-lg border border-border/60 bg-card p-4">
+                    <h3 className="text-sm font-semibold">{item}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Refreshed twice daily with anomaly detection by the reasoning agent.
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="lg:w-7/12">
+              <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">Top Emerging Roles</span>
+                    <h3 className="mt-1 text-lg font-semibold">AI Product Manager</h3>
+                  </div>
+                  <Badge variant="outline" className="uppercase">High Demand</Badge>
+                </div>
+                <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                  {["LLM Ops", "Responsible AI", "Pricing Strategy"].map((skill) => (
+                    <div key={skill} className="rounded-lg border border-border/50 bg-muted/30 p-3 text-sm">
+                      {skill}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 rounded-lg border border-border/50 bg-muted/20 p-4 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">Salary Range</span>
+                    <span className="text-muted-foreground">USD 170k – 210k</span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Based on a blended sample of venture-backed and enterprise postings across major hubs.
+                  </p>
+                </div>
+                <div className="mt-6 flex flex-wrap items-center gap-2 text-xs">
+                  <Badge variant="outline">Beta</Badge>
+                  <span className="text-muted-foreground">Agent-powered insights syncing to your dashboard weekly goals.</span>
+                </div>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Button size="sm" onClick={() => handleFeatureOpen(marketPulseFeature)}>
+                    View Feature Roadmap
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setCurrentStep("dashboard")}>
+                    Sync to Dashboard
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {roleTemplatesFeature && (
+        <section className="border-t border-border/50 bg-card py-20">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-3 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
+                <FilePenLine className="h-4 w-4" aria-hidden="true" /> Role-Based Templates
+              </div>
+              <Badge variant="outline" className="uppercase">Coming soon</Badge>
+            </div>
+            <div className="mt-8 grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+              <div>
+                <h2 className="text-3xl font-bold md:text-4xl">Apply Faster With Smart Document Kits</h2>
+                <p className="mt-4 text-muted-foreground">
+                  Generate resumes, outreach emails, and follow-up notes that automatically reference your roadmap milestones, quantified achievements, and verified skills.
+                </p>
+                <div className="mt-6 space-y-4 text-sm">
+                  {[
+                    "ATS-friendly resume exports mapped to target role keywords",
+                    "Personalized outreach email drafts grounded in your latest progress",
+                    "Auto-inserted portfolio links and skill badges based on completion streaks",
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-2">
+                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <Button onClick={() => handleFeatureOpen(roleTemplatesFeature)}>
+                    View Feature Roadmap
+                  </Button>
+                  <Button variant="outline" onClick={() => setCurrentStep("profile")}>
+                    Update Profile Inputs
+                  </Button>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border/50 bg-muted/30 p-6 shadow-lg">
+                <div className="space-y-3 text-sm">
+                  <div className="rounded-lg border border-border/60 bg-background p-4">
+                    <div className="flex items-center justify-between text-xs uppercase text-muted-foreground">
+                      <span>Template Preview</span>
+                      <span>Product Manager Role</span>
+                    </div>
+                    <p className="mt-3 font-semibold">Summary Snippet</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Leading cross-functional delivery of AI features with measurable impact; recently shipped the Market Pulse Radar beta and elevated adoption by 32% within 14 days.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/60 bg-background p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Skills & Proof Points</p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      {["LLM Strategy", "Stakeholder Ops", "Experimentation", "Resume Optimization"].map((tag) => (
+                        <Badge key={tag} variant="outline">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border/60 bg-background p-4 text-xs text-muted-foreground">
+                    <p className="font-semibold text-foreground">Auto-tailored Email Draft</p>
+                    <p className="mt-2">
+                      Hi Hiring Team — I recently completed the Adaptive Interview Simulator sprints and launched the Market Pulse Radar beta. Attaching my tailored resume with quantified impacts aligned to your AI product roadmap.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* CTA */}
       <section className="py-20">
