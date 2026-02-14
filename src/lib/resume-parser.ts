@@ -100,17 +100,98 @@ function getExtension(filename: string): string {
 async function extractPdfText(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const pdfjsLib = await loadPdfJs();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pdf = await pdfjsLib.getDocument({
+    data: arrayBuffer,
+    disableFontFace: true,
+    isEvalSupported: false,
+  }).promise;
   let combinedText = "";
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
-    const content = await page.getTextContent();
-    const pageText = content.items.map((item) => ("str" in item ? item.str : "")).join(" ");
+    const pageText = await extractPdfPageText(page);
     combinedText += `${pageText}\n`;
   }
 
   return cleanResumeText(combinedText);
+}
+
+async function extractPdfPageText(page: any): Promise<string> {
+  const baseContent = await page.getTextContent({ normalizeWhitespace: true, disableCombineTextItems: false });
+  let text = rebuildTextFromItems(baseContent.items);
+
+  if (text.length < 40) {
+    const fallbackContent = await page.getTextContent({ normalizeWhitespace: true, disableCombineTextItems: true });
+    const fallbackText = rebuildTextFromItems(fallbackContent.items);
+    if (fallbackText.length > text.length) {
+      text = fallbackText;
+    }
+  }
+
+  return text;
+}
+
+type TextContentItem = {
+  str?: string;
+  transform?: number[];
+  hasEOL?: boolean;
+};
+
+function rebuildTextFromItems(items: TextContentItem[]): string {
+  const LINE_GAP_THRESHOLD = 7;
+  const SPACE_GAP_THRESHOLD = 4;
+
+  const lines: string[] = [];
+  let currentLine: string[] = [];
+  let lastY: number | null = null;
+  let lastX: number | null = null;
+
+  for (const item of items) {
+    const raw = item.str ?? "";
+    const text = raw.replace(/\s+/g, " ").trim();
+    if (!text) continue;
+
+    const transform = item.transform ?? [];
+    const x = transform[4] ?? null;
+    const y = transform[5] ?? null;
+
+    if (lastY !== null && y !== null && Math.abs(y - lastY) > LINE_GAP_THRESHOLD) {
+      pushCurrentLine(lines, currentLine);
+      currentLine = [];
+      lastX = null;
+    }
+
+    if (lastX !== null && x !== null && Math.abs(x - lastX) > SPACE_GAP_THRESHOLD) {
+      currentLine.push(" ");
+    }
+
+    currentLine.push(text);
+
+    if (item.hasEOL) {
+      pushCurrentLine(lines, currentLine);
+      currentLine = [];
+      lastX = null;
+    } else {
+      lastX = x ?? lastX;
+    }
+
+    lastY = y ?? lastY;
+  }
+
+  pushCurrentLine(lines, currentLine);
+
+  return lines
+    .map((line) => line.join("").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function pushCurrentLine(lines: string[], currentLine: string[]) {
+  if (currentLine.length === 0) return;
+  const joined = currentLine.join("").replace(/\s+/g, " ").trim();
+  if (joined) {
+    lines.push(joined);
+  }
 }
 
 async function extractDocxText(file: File): Promise<string> {
@@ -144,16 +225,16 @@ function collectStrings(value: unknown): string[] {
   return [];
 }
 
-let pdfjsLibPromise: Promise<typeof import("pdfjs-dist/build/pdf")> | null = null;
+let pdfjsLibPromise: Promise<typeof import("pdfjs-dist/legacy/build/pdf")> | null = null;
 let pdfWorkerInitialized = false;
 
 async function loadPdfJs() {
   if (!pdfjsLibPromise) {
-    pdfjsLibPromise = import("pdfjs-dist/build/pdf");
+    pdfjsLibPromise = import("pdfjs-dist/legacy/build/pdf");
   }
   const pdfjsLib = await pdfjsLibPromise;
   if (!pdfWorkerInitialized) {
-    const workerModule = await import("pdfjs-dist/build/pdf.worker.entry");
+    const workerModule = await import("pdfjs-dist/legacy/build/pdf.worker.entry");
     const workerSrc = (workerModule as { default?: string }).default ?? (workerModule as unknown as string);
     if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
@@ -200,6 +281,10 @@ export async function analyzeResumeFile(file: File): Promise<ResumeAnalysisResul
 
   if (!text) {
     throw new Error("We couldn't read any text from that file.");
+  }
+
+  if (format === "pdf" && text.length < 80) {
+    throw new Error("We couldn't detect readable text in that PDF. It may be scanned or image-only. Please upload a text-based PDF, DOCX, or JSON resume instead.");
   }
 
   const derived = deriveProfileDetails(text);
