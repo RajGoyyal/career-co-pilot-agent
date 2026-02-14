@@ -181,7 +181,7 @@ function rebuildTextFromItems(items: TextContentItem[]): string {
   pushCurrentLine(lines, currentLine);
 
   return lines
-    .map((line) => line.join("").replace(/\s+/g, " ").trim())
+    .map((line) => line.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .join("\n");
 }
